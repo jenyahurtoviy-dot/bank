@@ -1,0 +1,1265 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aivora | Ultimate AI Banking v11</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* === БАЗОВЫЕ ПЕРЕМЕННЫЕ И НАСТРОЙКИ === */
+        :root {
+            --bg-color: #030002;
+            --text-main: #ffffff;
+            --text-muted: #9e8791;
+            --accent-1: #ff0055;
+            --accent-2: #ff2a6d;
+            --accent-glow: rgba(255, 0, 85, 0.4);
+            --glass-bg: rgba(20, 5, 10, 0.65);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --modal-shadow: 0 30px 60px rgba(0, 0, 0, 0.9), 0 0 50px rgba(255, 0, 85, 0.15);
+            --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Space Grotesk', sans-serif; cursor: none !important; }
+        html { scroll-behavior: smooth; }
+        body { background-color: var(--bg-color); color: var(--text-main); overflow-x: hidden; min-height: 100vh; position: relative; }
+        
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.5); }
+        ::-webkit-scrollbar-thumb { background: var(--accent-1); border-radius: 10px; }
+
+        /* === КУРСОР === */
+        .custom-cursor {
+            position: fixed; width: 14px; height: 14px; background: var(--accent-1);
+            border-radius: 50%; pointer-events: none; z-index: 9999;
+            top: 0; left: 0; will-change: transform;
+            box-shadow: 0 0 15px var(--accent-1), 0 0 30px var(--accent-1);
+            transition: width 0.2s, height 0.2s, background-color 0.2s;
+        }
+
+        /* === ФОНЫ И ЭФФЕКТЫ === */
+        .world-map-bg {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -2; opacity: 0.12; pointer-events: none;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 500" fill="none" stroke="%23ff0055" stroke-width="1"><path d="M150,150 Q200,100 250,130 T300,200 T200,300 Z M350,100 Q450,80 500,150 T450,300 T380,250 Z M550,120 Q650,100 750,160 T850,220 T700,380 T600,280 Z"/></svg>');
+            background-size: cover; background-position: center;
+        }
+        .glow-circle {
+            position: fixed; width: 700px; height: 700px;
+            background: radial-gradient(circle, rgba(255,0,85,0.15) 0%, transparent 70%);
+            filter: blur(120px); opacity: 0.8; border-radius: 50%; z-index: -1;
+            pointer-events: none; top: 0; left: 0; will-change: transform;
+        }
+        .noise-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1; opacity: 0.03; pointer-events: none;
+            background-image: url('data:image/svg+xml;utf8,<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><filter id="noiseFilter"><feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23noiseFilter)"/></svg>');
+        }
+
+        /* === НАВИГАЦИЯ === */
+        nav {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 16px 36px; position: fixed; width: 85%; max-width: 1200px;
+            top: 25px; left: 50%; transform: translateX(-50%);
+            background: var(--glass-bg); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
+            border: 1px solid var(--glass-border); border-radius: 40px; z-index: 1000;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        .logo { font-size: 24px; font-weight: 700; letter-spacing: 2px; color: #fff; text-shadow: 0 0 15px rgba(255,0,85,0.5); }
+        .logo span { color: var(--accent-1); }
+        .nav-links { display: flex; gap: 30px; list-style: none; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-weight: 500; font-size: 14px; transition: var(--transition); }
+        .nav-links a:hover { color: #fff; text-shadow: 0 0 10px rgba(255,255,255,0.4); }
+
+        .auth-buttons, .user-profile-nav { display: flex; gap: 12px; align-items: center; }
+        .user-profile-nav { display: none; }
+        .user-profile-info { display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.03); padding: 5px 14px 5px 5px; border-radius: 35px; border: 1px solid var(--glass-border); transition: var(--transition); }
+        .user-profile-info:hover { background: rgba(255,0,85,0.1); border-color: var(--accent-1); }
+        .user-avatar { width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-1), var(--accent-2)); display: flex; justify-content: center; align-items: center; font-weight: 700; color: white; font-size: 14px; box-shadow: 0 0 10px rgba(255,0,85,0.4); }
+        .logout-icon-btn { color: var(--text-muted); font-size: 13px; padding: 8px 14px; background: rgba(255,255,255,0.02); border: 1px solid var(--glass-border); border-radius: 20px; transition: var(--transition); }
+        .logout-icon-btn:hover { color: var(--accent-1); border-color: var(--accent-1); background: rgba(255,0,85,0.1); }
+
+        /* === КНОПКИ === */
+        .btn {
+            background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+            color: #ffffff; padding: 12px 28px; border: none; border-radius: 32px;
+            font-weight: 600; font-size: 14px; letter-spacing: 0.5px; transition: var(--transition);
+            box-shadow: 0 5px 20px rgba(255,0,85,0.3); position: relative; overflow: hidden;
+        }
+        .btn::before { content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent); transition: 0.5s; }
+        .btn:hover::before { left: 100%; }
+        .btn:hover { transform: translateY(-3px); box-shadow: 0 8px 30px rgba(255,0,85,0.5); }
+        .btn-outline { background: rgba(255, 255, 255, 0.03); border: 1px solid var(--glass-border); color: #fff; box-shadow: none; }
+        .btn-outline:hover { background: rgba(255, 255, 255, 0.08); border-color: var(--accent-1); box-shadow: 0 0 15px rgba(255,0,85,0.2); }
+
+        /* === ЛЕНДИНГ (ГЛАВНАЯ СТРАНИЦА) === */
+        #landing-page { transition: opacity 0.4s ease; padding-top: 150px; }
+        .hero { display: flex; align-items: center; justify-content: space-between; min-height: 70vh; padding: 0 8%; max-width: 1600px; margin: 0 auto; }
+        .hero-text { max-width: 600px; }
+        .hero-text h1 { font-size: 68px; line-height: 1.1; margin-bottom: 25px; font-weight: 700; letter-spacing: -1px; }
+        .hero-text h1 span { background: linear-gradient(90deg, var(--accent-1), var(--accent-2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .hero-text p { color: var(--text-muted); font-size: 18px; line-height: 1.6; margin-bottom: 40px; }
+
+        /* ИНТЕРАКТИВНАЯ 3D КАРТА (ГЛОБАЛЬНОЕ СЛЕЖЕНИЕ) */
+        .card-container { perspective: 1200px; display: flex; justify-content: center; align-items: center; z-index: 10; }
+        .glass-card {
+            width: 440px; height: 270px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+            backdrop-filter: blur(35px); -webkit-backdrop-filter: blur(35px);
+            border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 28px; padding: 35px;
+            display: flex; flex-direction: column; justify-content: space-between;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.7), inset 0 0 25px rgba(255,255,255,0.05);
+            transform-style: preserve-3d;
+            transition: transform 0.1s ease-out, border-color 0.3s ease, box-shadow 0.3s ease;
+            will-change: transform;
+        }
+        .glass-card:hover { border-color: rgba(255,0,85,0.6); box-shadow: 0 35px 70px rgba(0,0,0,0.8), 0 0 45px rgba(255,0,85,0.3); }
+        .card-top { display: flex; justify-content: space-between; align-items: center; transform: translateZ(35px); }
+        .chip { width: 50px; height: 38px; background: linear-gradient(135deg, #e6c27a, #d4af37); border-radius: 8px; opacity: 0.95; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+        .card-logo { font-weight: 700; font-size: 22px; letter-spacing: 3px; color: rgba(255,255,255,0.95); }
+        .card-holder { color: #fff; font-weight: 600; font-size: 22px; letter-spacing: 1.5px; margin-top: 10px; transform: translateZ(45px); text-shadow: 0 2px 5px rgba(0,0,0,0.5); }
+        .card-bottom { display: flex; justify-content: space-between; color: rgba(255,255,255,0.7); font-size: 13px; text-transform: uppercase; letter-spacing: 1px; transform: translateZ(25px); }
+        
+        .click-hint { position: absolute; top: -40px; right: -20px; background: var(--accent-1); color: #fff; padding: 6px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; animation: bounce 2s infinite; transform: translateZ(50px); pointer-events: none; box-shadow: 0 5px 15px rgba(255,0,85,0.4); }
+        .click-hint::after { content: ''; position: absolute; bottom: -5px; left: 20px; border-width: 5px 5px 0; border-style: solid; border-color: var(--accent-1) transparent transparent transparent; }
+        @keyframes bounce { 0%, 100% { transform: translateZ(50px) translateY(0); } 50% { transform: translateZ(50px) translateY(-10px); } }
+
+        /* Секция статистики лендинга */
+        .stats-section { display: flex; justify-content: center; gap: 60px; padding: 60px 8%; border-top: 1px solid var(--glass-border); border-bottom: 1px solid var(--glass-border); background: rgba(0,0,0,0.3); margin: 60px 0; }
+        .stat-item { text-align: center; }
+        .stat-number { font-size: 42px; font-weight: 700; color: #fff; margin-bottom: 5px; text-shadow: 0 0 20px rgba(255,255,255,0.2); }
+        .stat-label { color: var(--accent-1); font-size: 14px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
+
+        /* Блок философии (Развернутый) */
+        .philosophy-section { max-width: 1400px; margin: 0 auto 120px; padding: 0 5%; }
+        .section-header { text-align: center; margin-bottom: 60px; }
+        .section-header h2 { font-size: 42px; font-weight: 700; margin-bottom: 15px; }
+        .section-header p { color: var(--text-muted); font-size: 18px; max-width: 600px; margin: 0 auto; }
+        
+        .acronym-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 24px; }
+        .acronym-card {
+            background: var(--glass-bg); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
+            border: 1px solid var(--glass-border); border-radius: 24px; padding: 32px;
+            display: flex; gap: 20px; align-items: flex-start; transition: var(--transition);
+            opacity: 0; transform: translateY(30px);
+        }
+        .acronym-card.visible { opacity: 1; transform: translateY(0); }
+        .acronym-card:hover { border-color: rgba(255,0,85,0.5); transform: translateY(-5px); box-shadow: 0 15px 40px rgba(0,0,0,0.6), inset 0 0 20px rgba(255,0,85,0.05); }
+        .acronym-letter { font-size: 42px; font-weight: 800; background: linear-gradient(135deg, var(--accent-1), var(--accent-2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; line-height: 1; text-shadow: 0 0 20px rgba(255,0,85,0.3); }
+        .acronym-content h3 { font-size: 20px; color: #fff; margin-bottom: 8px; font-weight: 600; }
+        .acronym-content p { font-size: 14px; color: var(--text-muted); line-height: 1.6; }
+
+        footer { border-top: 1px solid var(--glass-border); padding: 40px 8%; text-align: center; color: var(--text-muted); font-size: 13px; background: rgba(0,0,0,0.5); }
+
+        /* === ПРОФИЛЬ И ДАШБОРД === */
+        #profile-page { display: none; opacity: 0; transition: opacity 0.4s ease; padding: 130px 4% 60px; max-width: 1500px; margin: 0 auto; }
+        .dashboard-grid { display: grid; grid-template-columns: 2.2fr 1fr; gap: 30px; }
+        .dash-panel {
+            background: var(--glass-bg); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
+            border: 1px solid var(--glass-border); border-radius: 32px; padding: 35px;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.4);
+        }
+
+        .dash-tabs { display: flex; gap: 10px; margin-bottom: 30px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 15px; overflow-x: auto; scrollbar-width: none; }
+        .dash-tabs::-webkit-scrollbar { display: none; }
+        .dash-tab { background: transparent; border: 1px solid transparent; color: var(--text-muted); font-weight: 600; font-size: 14px; padding: 10px 20px; border-radius: 16px; transition: var(--transition); white-space: nowrap; }
+        .dash-tab.active { background: rgba(255, 0, 85, 0.1); color: #fff; border-color: rgba(255,0,85,0.4); box-shadow: 0 0 20px rgba(255,0,85,0.15); }
+        .dash-tab:hover:not(.active) { color: #fff; background: rgba(255,255,255,0.03); border-color: rgba(255,255,255,0.1); }
+
+        .balance-label { color: var(--text-muted); font-size: 16px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .balance-amount { font-size: 64px; font-weight: 700; color: #fff; margin-bottom: 5px; letter-spacing: -1px; }
+        .balance-diff { color: #00ff88; font-size: 15px; font-weight: 600; margin-bottom: 35px; display: flex; align-items: center; gap: 8px; background: rgba(0,255,136,0.1); display: inline-flex; padding: 4px 12px; border-radius: 20px; }
+        
+        .action-buttons { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
+        .action-btn { padding: 16px; background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); border-radius: 20px; color: #fff; font-weight: 600; font-size: 15px; transition: var(--transition); text-align: center; }
+        .action-btn:hover { background: rgba(255,0,85,0.1); border-color: var(--accent-1); transform: translateY(-3px); box-shadow: 0 10px 20px rgba(255,0,85,0.2); }
+
+        .ai-insight { display: flex; gap: 20px; align-items: center; background: linear-gradient(90deg, rgba(255,0,85,0.1), transparent); border-left: 4px solid var(--accent-1); padding: 20px 25px; border-radius: 0 20px 20px 0; margin-top: 35px; transition: var(--transition); border: 1px solid transparent; border-left-color: var(--accent-1); }
+        .ai-insight:hover { background: linear-gradient(90deg, rgba(255,0,85,0.15), rgba(255,255,255,0.02)); border-color: var(--glass-border); border-left-color: var(--accent-1); transform: translateX(5px); }
+        
+        /* Крипто Рынок */
+        .crypto-layout { display: grid; grid-template-columns: 1fr 1.6fr; gap: 24px; }
+        .crypto-list { background: rgba(0,0,0,0.3); border-radius: 24px; border: 1px solid var(--glass-border); overflow: hidden; height: 450px; display: flex; flex-direction: column; }
+        .crypto-header { display: flex; justify-content: space-between; padding: 16px 24px; background: rgba(255,255,255,0.02); font-size: 12px; color: var(--text-muted); border-bottom: 1px solid var(--glass-border); text-transform: uppercase; letter-spacing: 1px; }
+        .crypto-body { overflow-y: auto; flex: 1; }
+        .crypto-item { display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-bottom: 1px solid rgba(255,255,255,0.02); transition: 0.2s; }
+        .crypto-item:hover { background: rgba(255,255,255,0.05); }
+        .crypto-item.active { background: rgba(255, 0, 85, 0.1); border-left: 4px solid var(--accent-1); }
+        .crypto-info { display: flex; align-items: center; gap: 14px; }
+        .crypto-icon { width: 36px; height: 36px; border-radius: 50%; background: #fff; padding: 2px; }
+        .crypto-name { font-weight: 600; color: #fff; font-size: 16px; }
+        .crypto-symbol { font-size: 13px; color: var(--text-muted); text-transform: uppercase; }
+        .crypto-price-block { text-align: right; }
+        .crypto-price { font-weight: 600; color: #fff; font-size: 16px; }
+        .crypto-change.pos { color: #00ff88; font-size: 13px; }
+        .crypto-change.neg { color: var(--accent-1); font-size: 13px; }
+
+        .crypto-chart-container { background: rgba(0,0,0,0.3); border-radius: 24px; border: 1px solid var(--glass-border); padding: 24px; display: flex; flex-direction: column; }
+        .chart-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+        .chart-title-block h3 { font-size: 26px; color: #fff; margin-bottom: 4px; }
+        .chart-title-block p { color: var(--text-muted); font-size: 15px; }
+        .chart-canvas-wrapper { flex: 1; position: relative; min-height: 280px; }
+
+        /* Вкладка Аналитика */
+        .analytics-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+        .analytics-card { background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border); border-radius: 24px; padding: 25px; }
+        .pie-chart-wrapper { position: relative; height: 250px; width: 100%; display: flex; justify-content: center; }
+
+        /* Транзакции */
+        .history-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
+        .history-header h3 { font-size: 22px; font-weight: 600; }
+        .tx-list { display: flex; flex-direction: column; gap: 14px; max-height: 400px; overflow-y: auto; padding-right: 8px; }
+        .tx-item { display: flex; justify-content: space-between; align-items: center; padding: 18px; background: rgba(255,255,255,0.02); border-radius: 20px; transition: var(--transition); border: 1px solid transparent; }
+        .tx-item:hover { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1); transform: translateX(-5px); }
+        .tx-info { display: flex; align-items: center; gap: 16px; }
+        .tx-avatar { width: 46px; height: 46px; border-radius: 50%; display: flex; justify-content: center; align-items: center; border: 1px solid var(--glass-border); font-size: 18px; font-weight: bold; background: rgba(0,0,0,0.5); }
+        .tx-details h4 { color: #fff; font-size: 16px; margin-bottom: 4px; }
+        .tx-details p { color: var(--text-muted); font-size: 13px; }
+        .tx-amount { font-weight: 700; font-size: 17px; }
+        .tx-amount.pos { color: #00ff88; }
+        .tx-amount.neg { color: #fff; }
+
+        /* Настройки (Новая вкладка) */
+        .settings-form .input-group { margin-bottom: 20px; }
+        .settings-form label { display: block; margin-bottom: 8px; color: var(--text-muted); font-size: 14px; }
+        .settings-form input { width: 100%; padding: 16px 20px; background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border); border-radius: 16px; color: #fff; outline: none; transition: 0.3s; }
+        .settings-form input:focus { border-color: var(--accent-1); }
+        .toggle-switch { display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; background: rgba(255,255,255,0.02); border-radius: 16px; margin-bottom: 15px; border: 1px solid var(--glass-border); }
+        .switch-btn { width: 44px; height: 24px; background: rgba(255,255,255,0.1); border-radius: 12px; position: relative; transition: 0.3s; }
+        .switch-btn.active { background: var(--accent-1); }
+        .switch-btn::after { content: ''; position: absolute; width: 20px; height: 20px; background: #fff; border-radius: 50%; top: 2px; left: 2px; transition: 0.3s; }
+        .switch-btn.active::after { left: 22px; }
+
+        /* Плавающий чат-бот */
+        .chatbot-btn { position: fixed; bottom: 30px; left: 30px; width: 60px; height: 60px; background: linear-gradient(135deg, var(--accent-1), var(--accent-2)); border-radius: 50%; display: flex; justify-content: center; align-items: center; box-shadow: 0 10px 25px rgba(255,0,85,0.4); z-index: 2000; font-size: 24px; transition: 0.3s; }
+        .chatbot-btn:hover { transform: scale(1.1) rotate(10deg); }
+
+        /* === МОДАЛЬНЫЕ ОКНА === */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); display: flex; justify-content: center; align-items: center; z-index: 3000; opacity: 0; visibility: hidden; transition: all 0.3s ease; }
+        .modal-overlay.active { opacity: 1; visibility: visible; }
+        
+        .modal-content { background: rgba(10, 2, 6, 0.95); border: 1px solid rgba(255,255,255,0.1); border-radius: 40px; width: 950px; min-height: 550px; display: flex; box-shadow: var(--modal-shadow); transform: scale(0.95) translateY(20px); transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); overflow: hidden; position: relative; }
+        .modal-overlay.active .modal-content { transform: scale(1) translateY(0); }
+        
+        .close-btn { position: absolute; top: 20px; right: 30px; font-size: 32px; color: var(--text-muted); transition: 0.2s; z-index: 10; font-weight: 300; }
+        .close-btn:hover { color: #fff; transform: rotate(90deg); }
+        
+        .modal-form { flex: 1; padding: 50px; display: flex; flex-direction: column; justify-content: center; border-right: 1px solid rgba(255,255,255,0.05); }
+        .modal-form h2 { margin-bottom: 30px; font-size: 32px; color: #fff; font-weight: 700; }
+        .input-group { margin-bottom: 20px; }
+        .input-group input { width: 100%; padding: 18px 22px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--glass-border); border-radius: 20px; color: white; font-size: 16px; outline: none; transition: 0.3s; }
+        .input-group input:focus { border-color: var(--accent-1); background: rgba(255, 0, 85, 0.05); box-shadow: 0 0 20px rgba(255,0,85,0.2); }
+        
+        .modal-map-container { flex: 1.1; padding: 30px; display: flex; flex-direction: column; background: rgba(0,0,0,0.4); position: relative; }
+        #map { flex: 1; border-radius: 24px; border: 1px solid rgba(255,255,255,0.05); width: 100%; filter: grayscale(100%) invert(100%) contrast(150%); }
+
+        .action-modal-content { background: rgba(10, 2, 6, 0.98); border: 1px solid rgba(255,255,255,0.1); border-radius: 36px; width: 500px; padding: 45px; box-shadow: var(--modal-shadow); position: relative; text-align: center; transform: scale(0.95); transition: 0.3s; }
+        .modal-overlay.active .action-modal-content { transform: scale(1); }
+
+        /* Уведомления */
+        .toast-container { position: fixed; bottom: 30px; right: 30px; z-index: 4000; display: flex; flex-direction: column; gap: 12px; }
+        .toast { background: rgba(15, 2, 8, 0.95); border: 1px solid var(--accent-1); border-radius: 18px; padding: 18px 24px; color: #fff; font-size: 15px; font-weight: 500; box-shadow: 0 15px 35px rgba(0,0,0,0.8), 0 0 20px rgba(255,0,85,0.3); display: flex; align-items: center; gap: 14px; animation: slideIn 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; backdrop-filter: blur(15px); border-left: 4px solid var(--accent-1); }
+        @keyframes slideIn { from { transform: translateX(120%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    </style>
+</head>
+<body>
+
+    <div class="custom-cursor" id="custom-cursor"></div>
+
+    <div class="noise-overlay"></div>
+    <div class="world-map-bg"></div>
+    <div class="glow-circle" id="cursor-glow"></div>
+
+    <div class="chatbot-btn" onclick="showToast('💬 Чат-бот AIVORA активирован. Чем могу помочь?')" style="cursor: pointer;">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+    </div>
+
+    <nav>
+        <div class="logo" onclick="goHome()">AIVORA<span>.</span></div>
+        <ul class="nav-links">
+            <li><a onclick="goHome()">Главная</a></li>
+            <li><a onclick="goToProfile()">Активы</a></li>
+            <li><a onclick="openShopperModal()">Marketplace</a></li>
+            <li><a onclick="showToast('🚀 Страница инвестиций в разработке')">Инвестиции</a></li>
+        </ul>
+        
+        <div class="auth-buttons" id="nav-auth-btns">
+            <button class="btn btn-outline" style="padding: 10px 24px; font-size: 14px;" onclick="openModal('login')">Войти</button>
+            <button class="btn" style="padding: 10px 24px; font-size: 14px;" onclick="openModal('register')">Создать профиль</button>
+        </div>
+        
+        <div class="user-profile-nav" id="nav-user-profile">
+            <div class="user-profile-info" onclick="goToProfile()">
+                <div class="user-avatar" id="user-avatar-initials">U</div>
+                <span id="user-name-display" style="font-weight: 600; font-size: 14px; padding-right: 8px;">@cyber_user</span>
+            </div>
+            <div class="logout-icon-btn" onclick="logoutSim()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+            </div>
+        </div>
+    </nav>
+
+    <div id="landing-page">
+        <section class="hero">
+            <div class="hero-text">
+                <div style="display:inline-block; padding: 6px 16px; background: rgba(255,0,85,0.1); border: 1px solid rgba(255,0,85,0.3); border-radius: 20px; color: var(--accent-1); font-size: 13px; font-weight: 600; margin-bottom: 20px; letter-spacing: 1px;">AIVORA CORE V11.0 LIVE</div>
+                <h1>Банкинг новой <br><span>экосистемы</span></h1>
+                <p>Умный капитал, единый @карт-тег, живые крипто-активы и автоматическое управление налогами с помощью ИИ. Будущее уже здесь.</p>
+                <div style="display: flex; gap: 20px;">
+                    <button class="btn" style="padding: 18px 45px; font-size: 16px;" onclick="openModal('register')">Открыть счет</button>
+                    <button class="btn btn-outline" style="padding: 18px 30px; font-size: 16px;" onclick="document.getElementById('philosophy').scrollIntoView()">Узнать больше</button>
+                </div>
+            </div>
+
+            <div class="card-container" onclick="handleCardClick()" style="cursor: pointer;" title="Нажмите для входа">
+                <div class="glass-card" id="tilt-card" style="transition: transform 0.1s ease-out;">
+                    <div class="click-hint">Кликни меня</div>
+                    <div class="card-top">
+                        <div class="chip"></div>
+                        <div class="card-logo">AIVORA</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 12px; color: rgba(255,255,255,0.6); margin-bottom: 4px;">Unified Tag</div>
+                        <div class="card-holder" id="landing-card-tag">@guest_user</div>
+                    </div>
+                    <div class="card-bottom">
+                        <div>VALID THRU 12/30</div>
+                        <div><span style="color: #fff; font-weight: 700;">WORLD ELITE</span></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="stats-section reveal-on-scroll">
+            <div class="stat-item">
+                <div class="stat-number">$2.4B+</div>
+                <div class="stat-label">В управлении ИИ</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">0.01s</div>
+                <div class="stat-label">Скорость транзакций</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">AES-256</div>
+                <div class="stat-label">Военное шифрование</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">24/7</div>
+                <div class="stat-label">Мониторинг сети</div>
+            </div>
+        </section>
+
+        <section class="philosophy-section reveal-on-scroll" id="philosophy">
+            <div class="section-header">
+                <h2>Архитектура Безопасности</h2>
+                <p>Интеллектуальная система защиты ваших финансов, зашитая в каждую операцию. Расшифровка кода <b>A.I.V.O.R.A</b>.</p>
+            </div>
+            
+            <div class="acronym-grid">
+                <div class="acronym-card">
+                    <div class="acronym-letter">A</div>
+                    <div class="acronym-content">
+                        <h3>Artificial Intelligence</h3>
+                        <p>Нейросети нового поколения, непрерывно анализирующие паттерны транзакций для блокировки мошенничества до его совершения.</p>
+                    </div>
+                </div>
+                <div class="acronym-card">
+                    <div class="acronym-letter">I</div>
+                    <div class="acronym-content">
+                        <h3>Intelligent Routing</h3>
+                        <p>Умная маршрутизация платежей через децентрализованные узлы для обеспечения минимальных комиссий и высокой скорости.</p>
+                    </div>
+                </div>
+                <div class="acronym-card">
+                    <div class="acronym-letter">V</div>
+                    <div class="acronym-content">
+                        <h3>Verified Protocols</h3>
+                        <p>Строго проверенные криптографические протоколы с мульти-подписью. Ваши ключи всегда остаются только у вас.</p>
+                    </div>
+                </div>
+                <div class="acronym-card">
+                    <div class="acronym-letter">O</div>
+                    <div class="acronym-content">
+                        <h3>Operations</h3>
+                        <p>Бесшовные операции фиат/крипто. Мгновенная конвертация активов прямо во время оплаты картой в магазине.</p>
+                    </div>
+                </div>
+                <div class="acronym-card">
+                    <div class="acronym-letter">R</div>
+                    <div class="acronym-content">
+                        <h3>Reliable Nodes</h3>
+                        <p>Надежная распределенная инфраструктура серверов (Tier 4) с гарантированной доступностью 99.999% в любой точке мира.</p>
+                    </div>
+                </div>
+                <div class="acronym-card">
+                    <div class="acronym-letter">A</div>
+                    <div class="acronym-content">
+                        <h3>Automation</h3>
+                        <p>Полная автоматизация рутины: от авто-инвестирования сдачи до генерации налоговых отчетов в один клик.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <footer>
+            <div style="font-size: 20px; font-weight: 700; color: #fff; margin-bottom: 10px; letter-spacing: 2px;">AIVORA</div>
+            <p>© 2026 Aivora Financial Technologies. All rights reserved.</p>
+            <p style="margin-top: 10px; color: rgba(255,255,255,0.3);">Система защищена квантовым шифрованием. Средства застрахованы.</p>
+        </footer>
+    </div>
+
+    <div id="profile-page">
+        <div class="dashboard-grid">
+            
+            <div class="dash-left">
+                <div class="dash-panel" style="margin-bottom: 30px;">
+                    
+                    <div class="dash-tabs">
+                        <button class="dash-tab active" onclick="switchTab(this, 'overview')">Обзор счета</button>
+                        <button class="dash-tab" onclick="switchTab(this, 'crypto')">Крипто-Рынок 🔴</button>
+                        <button class="dash-tab" onclick="switchTab(this, 'cards')">Мои Карты</button>
+                        <button class="dash-tab" onclick="switchTab(this, 'analytics')">Аналитика</button>
+                        <button class="dash-tab" onclick="switchTab(this, 'settings')">Настройки</button>
+                    </div>
+
+                    <div id="tab-overview" class="fade-in">
+                        <div class="balance-label">
+                            <span>Общий капитал (USD)</span>
+                            <span style="color: var(--accent-2); cursor: pointer; font-size: 13px; background: rgba(255,0,85,0.1); padding: 4px 10px; border-radius: 12px;" onclick="triggerBonus()">+ Бонус ИИ</span>
+                        </div>
+                        <div class="balance-amount" id="balance-display">$0.00</div>
+                        <div class="balance-diff"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline><polyline points="16 7 22 7 22 13"></polyline></svg> +$450.20 (За неделю)</div>
+                        
+                        <div class="action-buttons" style="margin-top: 25px;">
+                            <button class="action-btn" onclick="openTransferModal()">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg> Перевод
+                            </button>
+                            <button class="action-btn" onclick="openTopUpModal()">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2" ry="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg> Пополнить
+                            </button>
+                            <button class="action-btn" onclick="openShopperModal()">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg> Магазин
+                            </button>
+                        </div>
+                        
+                        <div class="ai-insight" onclick="triggerAiScan()" style="cursor: pointer;">
+                            <div style="width: 45px; height: 45px; background: rgba(255,0,85,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(255,0,85,0.3);">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent-1)" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                            </div>
+                            <div>
+                                <h4 style="color:#fff; font-size:16px; margin-bottom:4px; display:flex; align-items:center; gap:8px;">AI Финансовый Советник <span style="font-size: 10px; background: var(--accent-1); color:#fff; padding: 2px 6px; border-radius: 8px;">PRO</span></h4>
+                                <p style="color:var(--text-muted); font-size:14px; line-height:1.4;">Рынок криптовалют вырос на 2.4%. Автоматический алгоритм рекомендует перераспределить 5% фиата в Bitcoin. Нажмите для авто-исполнения.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="tab-crypto" class="fade-in" style="display: none;">
+                        <div class="crypto-layout">
+                            <div class="crypto-list">
+                                <div class="crypto-header">
+                                    <span>Топ Активов</span>
+                                    <span>Цена / Изм(24ч)</span>
+                                </div>
+                                <div class="crypto-body" id="crypto-table">
+                                    <div style="padding: 30px; text-align: center; color: var(--text-muted); font-size: 14px;">
+                                        <div style="width:30px; height:30px; border:3px solid rgba(255,0,85,0.3); border-top-color:var(--accent-1); border-radius:50%; animation:spin 1s linear infinite; margin: 0 auto 15px;"></div>
+                                        Синхронизация с блокчейном...
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="crypto-chart-container">
+                                <div class="chart-header">
+                                    <div class="chart-title-block">
+                                        <h3 id="chart-title-name" style="display:flex; align-items:center; gap:10px;">Загрузка...</h3>
+                                        <p id="chart-title-price" style="font-size: 24px; color:#fff; font-weight:700; margin-top:5px;">--</p>
+                                    </div>
+                                    <div style="font-size: 12px; padding: 6px 14px; background: rgba(255,255,255,0.08); border-radius: 12px; color:#fff; font-weight:600;">График: 7 Дней</div>
+                                </div>
+                                <div class="chart-canvas-wrapper">
+                                    <canvas id="mainCryptoChart"></canvas>
+                                </div>
+                                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-top:20px;">
+                                    <button class="btn" style="padding:10px; font-size:14px;" onclick="showToast('✅ Ордер на покупку создан')">Купить</button>
+                                    <button class="btn btn-outline" style="padding:10px; font-size:14px;" onclick="showToast('✅ Ордер на продажу создан')">Продать</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="tab-cards" class="fade-in" style="display: none;">
+                        <h3 style="font-size: 24px; color: #fff; margin-bottom: 20px;">Управление картами</h3>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                            <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--accent-1); border-radius: 20px; padding: 25px; box-shadow: 0 0 20px rgba(255,0,85,0.1);">
+                                <h4 style="color:#fff; margin-bottom: 10px;">Основная карта</h4>
+                                <p style="color:var(--text-muted); font-size:14px; margin-bottom: 20px;">Физическая • Platinum</p>
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 15px; font-size: 14px;"><span>Лимит</span> <span style="color:#fff;">$4,500 / $10,000</span></div>
+                                <div style="width: 100%; background: rgba(255,255,255,0.1); height: 6px; border-radius: 3px; margin-bottom: 20px;"><div style="width: 45%; height: 100%; background: var(--accent-1); border-radius: 3px;"></div></div>
+                                <button class="btn btn-outline" style="width: 100%; font-size: 13px;" onclick="openDetailsModal()">Смотреть реквизиты</button>
+                            </div>
+                            
+                            <div style="background: rgba(255,255,255,0.02); border: 1px dashed var(--glass-border); border-radius: 20px; padding: 25px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; cursor: pointer; transition: 0.3s;" onmouseover="this.style.borderColor='var(--accent-1)'" onmouseout="this.style.borderColor='var(--glass-border)'" onclick="showToast('💳 Выпуск новой виртуальной карты инициирован')">
+                                <div style="width: 50px; height: 50px; background: rgba(255,255,255,0.05); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; color: #fff; margin-bottom: 15px;">+</div>
+                                <h4 style="color:#fff; margin-bottom: 5px;">Создать виртуальную</h4>
+                                <p style="color:var(--text-muted); font-size:13px;">Для безопасных покупок в интернете</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="tab-analytics" class="fade-in" style="display: none;">
+                        <div class="analytics-layout">
+                            <div class="analytics-card">
+                                <h3 style="color:#fff; font-size: 18px; margin-bottom: 25px;">Расходы за Август</h3>
+                                <div class="pie-chart-wrapper">
+                                    <canvas id="expenseChart"></canvas>
+                                </div>
+                            </div>
+                            <div class="analytics-card" style="display: flex; flex-direction: column; justify-content: center;">
+                                <div class="balance-label"><span>Всего потрачено</span></div>
+                                <div class="balance-amount">$3,420.00</div>
+                                <div class="balance-diff" style="color: var(--accent-1); background: rgba(255,0,85,0.1);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="22 17 13.5 8.5 8.5 13.5 2 7"></polyline><polyline points="16 17 22 17 22 11"></polyline></svg> +12% к прошлому месяцу</div>
+                                
+                                <div style="margin-top: 20px;">
+                                    <div style="display:flex; justify-content:space-between; font-size:14px; margin-bottom:10px;"><span style="color:var(--text-muted);">Инвестиции</span><span style="color:#fff;">$1,800 (52%)</span></div>
+                                    <div style="display:flex; justify-content:space-between; font-size:14px; margin-bottom:10px;"><span style="color:var(--text-muted);">Рестораны</span><span style="color:#fff;">$950 (28%)</span></div>
+                                    <div style="display:flex; justify-content:space-between; font-size:14px; margin-bottom:10px;"><span style="color:var(--text-muted);">Подписки</span><span style="color:#fff;">$320 (9%)</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="tab-settings" class="fade-in" style="display: none;">
+                        <h3 style="font-size: 24px; color: #fff; margin-bottom: 25px;">Настройки безопасности</h3>
+                        <div style="max-width: 600px;" class="settings-form">
+                            <div class="toggle-switch">
+                                <div>
+                                    <div style="color:#fff; font-weight:600; font-size:15px; margin-bottom:4px;">Двухфакторная аутентификация (2FA)</div>
+                                    <div style="color:var(--text-muted); font-size:13px;">Подтверждение входа через приложение-аутентификатор</div>
+                                </div>
+                                <div class="switch-btn active" onclick="this.classList.toggle('active'); showToast('Настройка 2FA изменена')"></div>
+                            </div>
+                            
+                            <div class="toggle-switch">
+                                <div>
+                                    <div style="color:#fff; font-weight:600; font-size:15px; margin-bottom:4px;">AI Блокировка аномалий</div>
+                                    <div style="color:var(--text-muted); font-size:13px;">Автоматически замораживать карту при подозрительных транзакциях</div>
+                                </div>
+                                <div class="switch-btn active" onclick="this.classList.toggle('active'); showToast('Настройка AI защиты изменена')"></div>
+                            </div>
+
+                            <div style="margin-top: 30px; padding-top: 30px; border-top: 1px solid var(--glass-border);">
+                                <label>Изменить Email адрес</label>
+                                <div class="input-group" style="display:flex; gap:15px;">
+                                    <input type="email" placeholder="Новый email" id="set-email">
+                                    <button class="btn btn-outline" style="white-space:nowrap;" onclick="showToast('Запрос на смену Email отправлен')">Обновить</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="dash-panel">
+                    <div class="history-header">
+                        <h3 style="font-size: 20px; color: #fff;">История операций</h3>
+                        <span style="color: var(--accent-1); font-size: 14px; font-weight:600; cursor: pointer;" onclick="generateMockTransactions()">Обновить</span>
+                    </div>
+                    <div class="tx-list" id="transaction-list">
+                        <div class="tx-item">
+                            <div class="tx-info">
+                                <div class="tx-avatar" style="background: rgba(0,255,136,0.1); color: #00ff88; border-color: rgba(0,255,136,0.3);">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                                </div>
+                                <div class="tx-details">
+                                    <h4 style="font-size: 15px;">Создание ИИ-счета</h4>
+                                    <p>Системное сообщение • Начальный баланс</p>
+                                </div>
+                            </div>
+                            <div class="tx-amount pos">+$0.00</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dash-right">
+                <div class="dash-panel" style="position: sticky; top: 120px;">
+                    <div class="card-preview-wrapper" style="perspective: 1000px;">
+                        <div class="glass-card" style="width: 100%; height: 220px; padding: 25px; transition: transform 0.1s ease-out;" id="profile-card">
+                            <div class="card-top">
+                                <div class="chip" style="width: 40px; height: 30px;"></div>
+                                <div class="card-logo" style="font-size: 18px;">AIVORA</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 11px; color: rgba(255,255,255,0.5); margin-bottom: 2px;">Unified Tag</div>
+                                <div class="card-holder" id="dash-card-tag" style="font-size: 18px;">@user</div>
+                            </div>
+                            <div class="card-bottom">
+                                <div style="font-size: 11px;">MEMBER 2026</div>
+                                <div style="font-size: 11px;"><span id="card-status-text" style="color: #00ff88; font-weight:700;">ACTIVE</span></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card-controls">
+                        <button class="action-btn" style="padding: 14px; font-size: 13px;" onclick="openDetailsModal()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg> Реквизиты
+                        </button>
+                        <button class="action-btn" id="freeze-btn" style="padding: 14px; font-size: 13px; color: var(--accent-1); border-color: rgba(255,0,85,0.3);" onclick="toggleFreezeCard()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg> Заморозить
+                        </button>
+                    </div>
+
+                    <div class="limit-bar" style="margin-top: 25px; padding-top: 25px; border-top: 1px solid var(--glass-border);">
+                        <div class="limit-header"><span style="color:#fff; font-weight:600;">Лимит расходов</span><span style="color:var(--accent-1);">$4,500 / $10,000</span></div>
+                        <div class="progress-bg"><div class="progress-fill"></div></div>
+                        <p style="font-size: 12px; color: var(--text-muted); margin-top: 10px; text-align:center;">Сброс лимита через 14 дней</p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="shopper-modal">
+        <div class="action-modal-content">
+            <span class="close-btn" onclick="closeShopperModal()">&times;</span>
+            <div style="width: 60px; height: 60px; background: rgba(255,0,85,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; color: var(--accent-1);">
+                <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            </div>
+            <h3 style="color:#fff; margin-bottom: 10px; font-size: 24px;">Marketplace Scanner</h3>
+            <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 25px; line-height: 1.5;">Укажите товар. ИИ просканирует глобальные рынки для поиска лучшей цены и применит кэшбэк.</p>
+            <div class="input-group">
+                <input type="text" id="modal-search-input" placeholder="Например: MacBook Pro M3, Билеты в Дубай...">
+            </div>
+            <button class="btn" style="width: 100%; margin-bottom: 14px; padding: 16px;" onclick="runAiShopping()">Запустить сканирование сети</button>
+            <div id="modal-search-results"></div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="auth-modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal()">&times;</span>
+            <div class="modal-form">
+                <div style="font-size: 12px; color: var(--accent-1); font-weight: 700; letter-spacing: 2px; margin-bottom: 10px; text-transform: uppercase;">Aivora Secure Net</div>
+                <h2 id="modal-title">Идентификация</h2>
+                <div class="input-group" id="username-group" style="display: none;">
+                    <input type="text" id="reg-username" placeholder="Придумайте уникальный @тег">
+                </div>
+                <div class="input-group"><input type="email" id="auth-email" placeholder="Email адрес"></div>
+                <div class="input-group"><input type="password" id="auth-password" placeholder="Ключ доступа (Пароль)"></div>
+                <button class="btn" id="auth-submit-btn" style="width: 100%; margin-top: 15px; padding: 18px; font-size: 16px;" onclick="submitAuth()">Инициировать протокол</button>
+                <div style="margin-top: 25px; text-align: center; font-size: 14px; color: var(--text-muted); cursor: pointer;" onclick="toggleAuthMode()">
+                    <p id="toggle-text">Впервые у нас? <span style="color: #fff; border-bottom: 1px solid var(--accent-1);">Создать счет</span></p>
+                </div>
+            </div>
+            <div class="modal-map-container">
+                <div style="position:absolute; top:20px; left:20px; z-index:1000; background:rgba(0,0,0,0.6); padding:10px 15px; border-radius:12px; border:1px solid var(--accent-1); color:#fff; font-size:12px;">
+                    <div style="display:flex; align-items:center; gap:8px;"><div style="width:8px; height:8px; background:#00ff88; border-radius:50%; box-shadow:0 0 10px #00ff88;"></div> Соединение установлено</div>
+                    <div style="color:var(--text-muted); margin-top:4px;">Узел: Frankfurt-01 (Шифрование AES-256)</div>
+                </div>
+                <div id="map"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="transfer-modal">
+        <div class="action-modal-content">
+            <span class="close-btn" onclick="closeTransferModal()">&times;</span>
+            <div style="width: 60px; height: 60px; background: rgba(255,255,255,0.05); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; color: #fff;">
+                <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+            </div>
+            <h3 style="color:#fff; margin-bottom: 8px; font-size: 24px;">Глобальный перевод</h3>
+            <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 25px;">Отправка средств по @тегу происходит мгновенно и без комиссий в любую точку мира.</p>
+            <div class="input-group"><input type="text" id="transfer-target" placeholder="Введите @получатель"></div>
+            <div class="input-group">
+                <div style="position:relative;">
+                    <span style="position:absolute; left:20px; top:18px; color:var(--text-muted); font-size:16px;">$</span>
+                    <input type="number" id="transfer-amount" placeholder="0.00" style="padding-left:40px; font-size: 18px; font-weight:600;">
+                </div>
+            </div>
+            <button class="btn" style="width: 100%; margin-top: 15px; padding: 18px;" onclick="executeTransfer()">Отправить средства</button>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="details-modal">
+        <div class="action-modal-content">
+            <span class="close-btn" onclick="closeDetailsModal()">&times;</span>
+            <h3 style="color:#fff; margin-bottom: 25px; font-size: 22px;">Реквизиты карты</h3>
+            
+            <div style="background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border); border-radius: 16px; padding: 20px; margin-bottom: 15px; text-align:left; position:relative; overflow:hidden;">
+                <div style="position:absolute; top:0; left:0; width:4px; height:100%; background:var(--accent-1);"></div>
+                <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 5px;">Номер карты:</p>
+                <p style="font-size: 22px; font-weight: 700; color: #fff; letter-spacing: 2px;">4049 8821 9012 4450</p>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px;">
+                <div style="background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border); border-radius: 16px; padding: 15px; text-align:left;">
+                    <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 5px;">Срок:</p>
+                    <p style="font-size: 18px; font-weight: 700; color: #fff;">08/29</p>
+                </div>
+                <div style="background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border); border-radius: 16px; padding: 15px; text-align:left;">
+                    <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 5px;">CVV:</p>
+                    <p style="font-size: 18px; font-weight: 700; color: var(--accent-1);">***</p>
+                </div>
+            </div>
+            <button class="btn btn-outline" style="width: 100%;" onclick="showToast('📋 Реквизиты скопированы в буфер обмена'); closeDetailsModal();">Скопировать данные</button>
+        </div>
+    </div>
+
+    <div class="toast-container" id="toast-container"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const API_URL = '/api';
+        
+        const modalAuth = document.getElementById('auth-modal');
+        const landingPage = document.getElementById('landing-page');
+        const profilePage = document.getElementById('profile-page');
+
+        let currentMode = 'login';
+        let map, myChart, expenseChart;
+        let isCardFrozen = false;
+        let cryptoDataCache = [];
+
+        // Инициализация при загрузке
+        window.addEventListener('DOMContentLoaded', () => {
+            const currentUser = localStorage.getItem('aivora_user');
+            if (currentUser) updateUserUI(currentUser);
+            setupCustomCursor();
+            setupScrollAnimations();
+            setupGlobalCardTracking(); // Запускаем глобальное слежение карточек
+            fetchCryptoData();
+            initExpenseChart();
+        });
+
+        /* === КУРСОР НА АППАРАТНОМ УСКОРЕНИИ === */
+        let mouseX = window.innerWidth / 2, mouseY = window.innerHeight / 2;
+        let cursorX = mouseX, cursorY = mouseY;
+        let glowX = mouseX, glowY = mouseY;
+
+        function setupCustomCursor() {
+            const cursor = document.getElementById('custom-cursor');
+            const glow = document.getElementById('cursor-glow');
+
+            window.addEventListener('mousemove', (e) => {
+                mouseX = e.clientX;
+                mouseY = e.clientY;
+            });
+
+            function renderCursor() {
+                cursorX += (mouseX - cursorX) * 0.4;
+                cursorY += (mouseY - cursorY) * 0.4;
+                glowX += (mouseX - glowX) * 0.08;
+                glowY += (mouseY - glowY) * 0.08;
+
+                if (cursor) cursor.style.transform = `translate3d(${cursorX}px, ${cursorY}px, 0) translate(-50%, -50%)`;
+                if (glow) glow.style.transform = `translate3d(${glowX}px, ${glowY}px, 0) translate(-50%, -50%)`;
+
+                requestAnimationFrame(renderCursor);
+            }
+            requestAnimationFrame(renderCursor);
+
+            // Реакция курсора на кликабельные элементы
+            document.querySelectorAll('a, button, input, .crypto-item, .user-profile-info, .ai-insight, .dash-tab, .chatbot-btn, .card-container').forEach(el => {
+                el.addEventListener('mouseenter', () => {
+                    if (cursor) {
+                        cursor.style.width = '24px';
+                        cursor.style.height = '24px';
+                        cursor.style.background = 'transparent';
+                        cursor.style.border = '2px solid var(--accent-1)';
+                        cursor.style.boxShadow = 'inset 0 0 10px var(--accent-1), 0 0 15px var(--accent-1)';
+                    }
+                });
+                el.addEventListener('mouseleave', () => {
+                    if (cursor) {
+                        cursor.style.width = '14px';
+                        cursor.style.height = '14px';
+                        cursor.style.background = 'var(--accent-1)';
+                        cursor.style.border = 'none';
+                        cursor.style.boxShadow = '0 0 15px var(--accent-1), 0 0 30px var(--accent-1)';
+                    }
+                });
+            });
+        }
+
+        /* === КАРТОЧКА ВСЕГДА СЛЕДИТ ЗА КУРСОРОМ === */
+        function setupGlobalCardTracking() {
+            window.addEventListener('mousemove', (e) => {
+                // Вычисляем позицию мыши относительно центра экрана (значения от -0.5 до 0.5)
+                const x = (e.clientX / window.innerWidth) - 0.5;
+                const y = (e.clientY / window.innerHeight) - 0.5;
+
+                // 1. Анимация карточки на главной странице (если она открыта)
+                const landingCard = document.getElementById('tilt-card');
+                if (landingCard && landingPage.style.display !== 'none') {
+                    // Умножаем на градусы (чем больше число, тем сильнее наклон)
+                    const rotateY = x * 40;  
+                    const rotateX = y * -40; 
+                    landingCard.style.transform = `perspective(1200px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(1.05)`;
+                }
+
+                // 2. Анимация карточки в профиле (если он открыт)
+                const profileCard = document.getElementById('profile-card');
+                if (profileCard && profilePage.style.display !== 'none') {
+                    const rotateY = x * 30;  
+                    const rotateX = y * -30; 
+                    profileCard.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(1.02)`;
+                }
+            });
+
+            // Возвращаем в исходное положение, если мышь ушла за пределы окна
+            document.body.addEventListener('mouseleave', () => {
+                const landingCard = document.getElementById('tilt-card');
+                if (landingCard) landingCard.style.transform = `perspective(1200px) rotateX(0deg) rotateY(0deg) scale(1)`;
+                
+                const profileCard = document.getElementById('profile-card');
+                if (profileCard) profileCard.style.transform = `perspective(1000px) rotateX(0deg) rotateY(0deg) scale(1)`;
+            });
+        }
+
+        /* === АНИМАЦИИ ПРИ СКРОЛЛЕ ЛЕНДИНГА === */
+        function setupScrollAnimations() {
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('visible');
+                    }
+                });
+            }, { threshold: 0.1 });
+
+            document.querySelectorAll('.reveal-on-scroll, .acronym-card').forEach(el => {
+                observer.observe(el);
+            });
+        }
+
+        /* === ЛОГИКА КЛИКА ПО КАРТЕ (ГЛАВНАЯ ФИЧА) === */
+        function handleCardClick() {
+            const currentUser = localStorage.getItem('aivora_user');
+            if (currentUser) {
+                showToast(`🔐 Идентификация подтверждена. Переход в систему...`);
+                goToProfile();
+            } else {
+                openModal('register');
+                showToast(`Внимание: требуется регистрация счета.`);
+            }
+        }
+
+        /* === КРИПТО РЫНОК (API CoinGecko) === */
+        async function fetchCryptoData() {
+            try {
+                // Берем топ 15 для масштабности
+                const res = await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=15&page=1&sparkline=true&price_change_percentage=24h');
+                if(!res.ok) throw new Error('API Rate limit');
+                const data = await res.json();
+                cryptoDataCache = data;
+                renderCryptoTable(data);
+                if(data.length > 0) renderCryptoChart(0);
+            } catch (e) {
+                console.error("Ошибка загрузки крипты:", e);
+                document.getElementById('crypto-table').innerHTML = '<div style="padding:30px; text-align:center; color:var(--accent-1); font-size:14px; background:rgba(255,0,85,0.05); border-radius:12px;">Слишком много запросов к узлу блокчейна.<br>Пожалуйста, подождите минуту.</div>';
+            }
+        }
+
+        function renderCryptoTable(data) {
+            const table = document.getElementById('crypto-table');
+            table.innerHTML = '';
+            
+            data.forEach((coin, index) => {
+                const isPos = coin.price_change_percentage_24h >= 0;
+                const changeClass = isPos ? 'pos' : 'neg';
+                const sign = isPos ? '+' : '';
+                
+                const el = document.createElement('div');
+                el.className = 'crypto-item';
+                el.onclick = () => {
+                    document.querySelectorAll('.crypto-item').forEach(i => i.classList.remove('active'));
+                    el.classList.add('active');
+                    renderCryptoChart(index);
+                };
+                
+                el.innerHTML = `
+                    <div class="crypto-info">
+                        <img src="${coin.image}" class="crypto-icon">
+                        <div>
+                            <div class="crypto-name">${coin.name}</div>
+                            <div class="crypto-symbol">${coin.symbol}</div>
+                        </div>
+                    </div>
+                    <div class="crypto-price-block">
+                        <div class="crypto-price">$${coin.current_price.toLocaleString('en-US', {maximumFractionDigits: 2})}</div>
+                        <div class="crypto-change ${changeClass}">${sign}${coin.price_change_percentage_24h.toFixed(2)}%</div>
+                    </div>
+                `;
+                table.appendChild(el);
+            });
+            if(table.firstChild) table.firstChild.classList.add('active');
+        }
+
+        function renderCryptoChart(index) {
+            const coin = cryptoDataCache[index];
+            if(!coin || !coin.sparkline_in_7d) return;
+
+            document.getElementById('chart-title-name').innerHTML = `<img src="${coin.image}" style="width:28px; height:28px; border-radius:50%;"> ${coin.name}`;
+            document.getElementById('chart-title-price').innerText = `$${coin.current_price.toLocaleString('en-US', {maximumFractionDigits: 4})}`;
+
+            const prices = coin.sparkline_in_7d.price;
+            const labels = prices.map((_, i) => i);
+            const isPos = prices[prices.length - 1] >= prices[0];
+            const color = isPos ? '#00ff88' : '#ff0055';
+            
+            const ctx = document.getElementById('mainCryptoChart').getContext('2d');
+            
+            // Градиент для красоты
+            let gradient = ctx.createLinearGradient(0, 0, 0, 300);
+            gradient.addColorStop(0, isPos ? 'rgba(0, 255, 136, 0.3)' : 'rgba(255, 0, 85, 0.3)');
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+            if (myChart) myChart.destroy();
+
+            myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: prices,
+                        borderColor: color,
+                        backgroundColor: gradient,
+                        borderWidth: 3,
+                        pointRadius: 0,
+                        pointHoverRadius: 6,
+                        pointHoverBackgroundColor: '#fff',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false, backgroundColor: 'rgba(0,0,0,0.8)' } },
+                    scales: {
+                        x: { display: false },
+                        y: { display: false, min: Math.min(...prices) * 0.99, max: Math.max(...prices) * 1.01 }
+                    }
+                }
+            });
+        }
+
+        /* === ГРАФИК РАСХОДОВ (АНАЛИТИКА) === */
+        function initExpenseChart() {
+            const ctx = document.getElementById('expenseChart');
+            if(!ctx) return;
+            
+            expenseChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Инвестиции', 'Рестораны', 'Подписки', 'Разное'],
+                    datasets: [{
+                        data: [1800, 950, 320, 350],
+                        backgroundColor: ['#ff0055', '#ff4081', '#5e17eb', '#2b0f4c'],
+                        borderWidth: 0,
+                        hoverOffset: 10
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '75%',
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
+
+        /* === ТАБЫ В ПРОФИЛЕ === */
+        function switchTab(btn, tabName) {
+            document.querySelectorAll('.dash-tab').forEach(t => t.classList.remove('active'));
+            btn.classList.add('active');
+
+            ['overview', 'crypto', 'cards', 'analytics', 'settings', 'yield'].forEach(t => {
+                const el = document.getElementById(`tab-${t}`);
+                if(el) el.style.display = t === tabName ? 'block' : 'none';
+            });
+            
+            // Фикс рендера canvas при display:none
+            if(tabName === 'crypto' && myChart) setTimeout(() => myChart.resize(), 50);
+            if(tabName === 'analytics' && expenseChart) setTimeout(() => expenseChart.resize(), 50);
+        }
+
+        /* === АВТОРИЗАЦИЯ И СВЯЗЬ С БЭКЕНДОМ === */
+        function openModal(mode) {
+            currentMode = mode;
+            modalAuth.classList.add('active');
+            document.getElementById('modal-title').innerText = mode === 'register' ? 'Идентификация (Новый)' : 'Идентификация (Вход)';
+            document.getElementById('username-group').style.display = mode === 'register' ? 'block' : 'none';
+            document.getElementById('auth-submit-btn').innerText = mode === 'register' ? 'Инициировать счет' : 'Получить доступ';
+            setTimeout(initMap, 200);
+        }
+
+        function closeModal() { modalAuth.classList.remove('active'); }
+        function toggleAuthMode() { openModal(currentMode === 'login' ? 'register' : 'login'); }
+
+        async function submitAuth() {
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-password').value;
+            const tag = document.getElementById('reg-username').value;
+            const route = currentMode === 'register' ? '/register' : '/login';
+            const payload = currentMode === 'register' ? { tag, email, password } : { email, password };
+
+            try {
+                const res = await fetch(`${API_URL}${route}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    localStorage.setItem('aivora_user', data.tag);
+                    showToast(`🎉 Успешно! Доступ разрешен для ${data.tag}`);
+                    closeModal();
+                    updateUserUI(data.tag);
+                    goToProfile();
+                } else {
+                    showToast("❌ " + data.error);
+                }
+            } catch (e) {
+                showToast("❌ Ошибка соединения с сервером (запусти node server.js)");
+            }
+        }
+
+        async function updateUserUI(tag) {
+            document.getElementById('nav-auth-btns').style.display = 'none';
+            document.getElementById('nav-user-profile').style.display = 'flex';
+            document.getElementById('user-name-display').innerText = tag;
+            document.getElementById('user-avatar-initials').innerText = tag.replace('@', '')[0].toUpperCase();
+            
+            // Обновляем теги на картах
+            document.getElementById('landing-card-tag').innerText = tag;
+            document.getElementById('dash-card-tag').innerText = tag;
+            
+            await refreshBalance(tag);
+        }
+
+        async function refreshBalance(tag) {
+            const userTag = tag || localStorage.getItem('aivora_user');
+            if (!userTag) return;
+            try {
+                const res = await fetch(`${API_URL}/user/${userTag}`);
+                const data = await res.json();
+                if (res.ok && data.balance !== undefined) {
+                    // Анимация набора чисел
+                    const display = document.getElementById('balance-display');
+                    animateValue(display, 0, data.balance, 1000);
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        function animateValue(obj, start, end, duration) {
+            let startTimestamp = null;
+            const step = (timestamp) => {
+                if (!startTimestamp) startTimestamp = timestamp;
+                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                const currentVal = (progress * (end - start) + start);
+                obj.innerHTML = '$' + currentVal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                if (progress < 1) {
+                    window.requestAnimationFrame(step);
+                }
+            };
+            window.requestAnimationFrame(step);
+        }
+
+        async function executeTransfer() {
+            const senderTag = localStorage.getItem('aivora_user');
+            const receiverTag = document.getElementById('transfer-target').value;
+            const amount = document.getElementById('transfer-amount').value;
+            if (!senderTag) return showToast("❌ Ошибка: Вы не авторизованы!");
+            if (!receiverTag || !amount) return showToast("❌ Заполните все поля!");
+
+            try {
+                const res = await fetch(`${API_URL}/transfer`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ senderTag, receiverTag, amount })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    const display = document.getElementById('balance-display');
+                    display.innerText = '$' + data.newBalance.toLocaleString('en-US', {minimumFractionDigits: 2});
+                    showToast(`💸 Перевод $${amount} пользователю ${data.receiver} успешно выполнен!`);
+                    closeTransferModal();
+                    
+                    // Добавляем фейковую транзакцию в список для красоты
+                    addTransactionNode(data.receiver, amount);
+                } else {
+                    showToast("❌ " + data.error);
+                }
+            } catch (e) { showToast("❌ Ошибка соединения"); }
+        }
+
+        /* === ГЕНЕРАТОР ТРАНЗАКЦИЙ (ФЕЙК ДЛЯ КРАСОТЫ) === */
+        function addTransactionNode(name, amount) {
+            const list = document.getElementById('transaction-list');
+            const el = document.createElement('div');
+            el.className = 'tx-item fade-in';
+            el.innerHTML = `
+                <div class="tx-info">
+                    <div class="tx-avatar" style="color:var(--text-main); border-color:var(--glass-border);">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                    </div>
+                    <div class="tx-details">
+                        <h4>Перевод: ${name}</h4>
+                        <p>Исходящий перевод • Только что</p>
+                    </div>
+                </div>
+                <div class="tx-amount neg">-$${parseFloat(amount).toFixed(2)}</div>
+            `;
+            list.prepend(el);
+        }
+
+        function generateMockTransactions() {
+            showToast("🔄 Синхронизация с узлами...");
+            setTimeout(() => {
+                const list = document.getElementById('transaction-list');
+                const names = ['Starbucks', 'Netflix', 'Binance Exchange', 'Apple Store', 'Uber Eats'];
+                const amounts = [4.50, 15.99, 500.00, 1299.00, 24.50];
+                const randomIdx = Math.floor(Math.random() * names.length);
+                
+                const el = document.createElement('div');
+                el.className = 'tx-item fade-in';
+                el.innerHTML = `
+                    <div class="tx-info">
+                        <div class="tx-avatar" style="color:#fff;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+                        </div>
+                        <div class="tx-details">
+                            <h4>${names[randomIdx]}</h4>
+                            <p>Оплата картой • Сегодня</p>
+                        </div>
+                    </div>
+                    <div class="tx-amount neg">-$${amounts[randomIdx].toFixed(2)}</div>
+                `;
+                list.prepend(el);
+            }, 800);
+        }
+
+        /* === НАВИГАЦИЯ МЕЖДУ СТРАНИЦАМИ === */
+        function goHome() {
+            profilePage.style.opacity = '0';
+            setTimeout(() => { 
+                profilePage.style.display = 'none'; 
+                landingPage.style.display = 'block'; 
+                // Даем браузеру отрендерить block, затем меняем прозрачность для плавности
+                setTimeout(() => landingPage.style.opacity = '1', 50);
+            }, 400);
+        }
+
+        function goToProfile() {
+            if (!localStorage.getItem('aivora_user')) {
+                openModal('login');
+                return showToast("🔐 Доступ закрыт. Пожалуйста, авторизуйтесь.");
+            }
+            landingPage.style.opacity = '0';
+            setTimeout(() => { 
+                landingPage.style.display = 'none'; 
+                profilePage.style.display = 'block'; 
+                setTimeout(() => profilePage.style.opacity = '1', 50);
+                refreshBalance(); 
+            }, 400);
+        }
+
+        function logoutSim() {
+            localStorage.removeItem('aivora_user');
+            document.getElementById('nav-auth-btns').style.display = 'flex';
+            document.getElementById('nav-user-profile').style.display = 'none';
+            document.getElementById('landing-card-tag').innerText = '@guest_user';
+            goHome();
+            showToast("👋 Сессия завершена. Ключи удалены.");
+        }
+
+        /* === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ И МОДАЛКИ === */
+        function toggleFreezeCard() {
+            isCardFrozen = !isCardFrozen;
+            document.getElementById('card-status-text').innerText = isCardFrozen ? 'FROZEN' : 'ACTIVE';
+            document.getElementById('card-status-text').style.color = isCardFrozen ? 'var(--accent-1)' : '#00ff88';
+            const btn = document.getElementById('freeze-btn');
+            btn.innerHTML = isCardFrozen ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg> Разморозить' : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg> Заморозить';
+            showToast(isCardFrozen ? "❄️ Физическая карта заморожена" : "✅ Карта разморожена, транзакции разрешены");
+        }
+
+        function openTransferModal() { document.getElementById('transfer-modal').classList.add('active'); }
+        function closeTransferModal() { document.getElementById('transfer-modal').classList.remove('active'); }
+        function openShopperModal() { document.getElementById('shopper-modal').classList.add('active'); }
+        function closeShopperModal() { document.getElementById('shopper-modal').classList.remove('active'); }
+        function openDetailsModal() { document.getElementById('details-modal').classList.add('active'); }
+        function closeDetailsModal() { document.getElementById('details-modal').classList.remove('active'); }
+        
+        function openTopUpModal() { showToast("💳 Шлюз для фиатных пополнений временно недоступен"); }
+        function triggerBonus() { showToast("🎁 Баунти-программа: Токены зачислены на бонусный счет"); }
+        function triggerAiScan() { showToast("🤖 Ордер на авто-покупку 5% BTC создан. Ожидание ликвидности."); }
+
+        function runAiShopping() {
+            const query = document.getElementById('modal-search-input').value;
+            const resBox = document.getElementById('modal-search-results');
+            if(!query) return showToast("Укажите наименование товара");
+            
+            resBox.innerHTML = '<div style="padding:15px; text-align:center;"><div style="width:24px; height:24px; border:3px solid var(--accent-1); border-top-color:transparent; border-radius:50%; animation:spin 1s linear infinite; margin:0 auto;"></div></div>';
+            
+            setTimeout(() => {
+                resBox.innerHTML = `
+                    <div style="padding:20px; background: rgba(0,255,136,0.05); border:1px solid rgba(0,255,136,0.3); border-radius:16px; margin-top:20px; display:flex; justify-content:space-between; align-items:center;">
+                        <div style="text-align:left;">
+                            <div style="color:#00ff88; font-weight:700; font-size:16px; margin-bottom:4px;">Лучшая цена найдена!</div>
+                            <div style="color:#fff; font-size:14px;">${query} • Amazon Global</div>
+                        </div>
+                        <div style="text-align:right;">
+                            <div style="color:#fff; font-size:22px; font-weight:700;">$${(Math.random() * 1000 + 50).toFixed(2)}</div>
+                            <div style="color:var(--accent-1); font-size:12px; font-weight:600;">+ Кэшбэк 15%</div>
+                        </div>
+                    </div>
+                    <button class="btn" style="width:100%; margin-top:15px; padding:15px; background:linear-gradient(135deg, #00ff88, #00cc6a); box-shadow:0 5px 20px rgba(0,255,136,0.3);" onclick="showToast('✅ Товар добавлен в умную корзину')">Купить с кэшбэком</button>
+                `;
+            }, 1200);
+        }
+
+        function showToast(text) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.innerHTML = text; // allow HTML tags
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(100px)';
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+
+        // Инициализация карты Leaflet
+        function initMap() {
+            if (map) return;
+            map = L.map('map', { zoomControl: false, attributionControl: false }).setView([50.1109, 8.6821], 4); // Frankfurt
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+            
+            // Добавляем маркер узла
+            const icon = L.divIcon({
+                className: 'custom-div-icon',
+                html: "<div style='background-color:#00ff88; width:12px; height:12px; border-radius:50%; border:2px solid #fff; box-shadow:0 0 15px #00ff88; animation: pulse 2s infinite;'></div>",
+                iconSize: [12, 12],
+                iconAnchor: [6, 6]
+            });
+            L.marker([50.1109, 8.6821], { icon: icon }).addTo(map);
+        }
+
+        // Анимации вращения (добавляем динамически через JS, чтобы не засорять CSS)
+        const style = document.createElement('style');
+        style.innerHTML = `
+            @keyframes spin { 100% { transform: rotate(360deg); } }
+            @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(0,255,136, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(0,255,136, 0); } 100% { box-shadow: 0 0 0 0 rgba(0,255,136, 0); } }
+            .fade-in { animation: fadeIn 0.5s ease forwards; }
+            @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        `;
+        document.head.appendChild(style);
+
+    </script>
+</body>
+</html>
